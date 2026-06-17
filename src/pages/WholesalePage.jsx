@@ -3,7 +3,7 @@ import { collection, onSnapshot, query, orderBy } from 'firebase/firestore'
 import { Link } from 'react-router-dom'
 import { db, isFirebaseReady } from '../firebase'
 import { MARIA_WHATSAPP } from '../constants'
-import Navbar from '../components/Navbar'
+import HeroCarousel from '../components/HeroCarousel'
 
 function WaIcon() {
   return (
@@ -112,26 +112,36 @@ function WholesalePage() {
 
   return (
     <div className="min-h-screen" style={{ background: '#FAF5FF' }}>
-      <Navbar />
 
-      {/* Hero */}
-      <div className="text-center py-8 px-4"
-        style={{ background: 'linear-gradient(160deg, #1E0437 0%, #3B0764 100%)' }}>
-        <p className="text-brand-gold text-xs tracking-[0.3em] uppercase mb-2 font-semibold">
-          💧 Oil Based · Custom Blend
-        </p>
-        <h2 className="text-3xl font-bold text-white mb-1"
-          style={{ fontFamily: '"Cormorant Garamond", Georgia, serif' }}>
-          Wholesale Store
-        </h2>
-        <p className="text-purple-300 text-sm">
-          Buy in dozens or bulk canisters — enquire via WhatsApp
-        </p>
-        <Link to="/"
-          className="inline-block mt-4 text-xs text-purple-300 hover:text-white transition-colors underline">
-          ← Back to Main Store
-        </Link>
-      </div>
+      {/* Hero — carousel of wholesale product photos behind a translucent purple veil */}
+      <header className="relative overflow-hidden">
+        <HeroCarousel collectionName="wholesale_products" />
+
+        <div className="absolute inset-0"
+          style={{ background: 'linear-gradient(160deg, rgba(30,4,55,0.82) 0%, rgba(59,7,100,0.72) 60%, rgba(74,14,143,0.72) 100%)' }} />
+
+        <div className="relative z-10 text-center py-8 px-4">
+          <Link to="/" className="inline-block text-brand-gold text-xs font-bold tracking-[0.2em] uppercase mb-3 hover:text-white transition-colors"
+            style={{ textShadow: '0 1px 8px rgba(0,0,0,0.4)' }}>
+            ✦ SephynLuna ✦
+          </Link>
+          <p className="text-brand-gold text-xs tracking-[0.3em] uppercase mb-2 font-semibold"
+            style={{ textShadow: '0 1px 8px rgba(0,0,0,0.4)' }}>
+            💧 Oil Based · Custom Blend
+          </p>
+          <h2 className="text-3xl font-bold text-white mb-1"
+            style={{ fontFamily: '"Cormorant Garamond", Georgia, serif', textShadow: '0 2px 12px rgba(0,0,0,0.45)' }}>
+            Wholesale Store
+          </h2>
+          <p className="text-purple-100 text-sm" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.4)' }}>
+            Buy in dozens or bulk canisters — enquire via WhatsApp
+          </p>
+          <Link to="/"
+            className="inline-block mt-4 text-xs text-purple-200 hover:text-white transition-colors underline">
+            ← Back to Main Store
+          </Link>
+        </div>
+      </header>
 
       {/* Filter tabs */}
       <div className="sticky top-0 z-20 bg-white shadow-sm border-b border-purple-100">

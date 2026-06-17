@@ -2,16 +2,19 @@ import { useState, useEffect } from 'react'
 import { collection, query, where, limit, getDocs } from 'firebase/firestore'
 import { db, isFirebaseReady } from '../firebase'
 
-function HeroCarousel() {
+function HeroCarousel({ collectionName = 'products', featuredOnly = false }) {
   const [images, setImages] = useState([])
 
   useEffect(() => {
     if (!isFirebaseReady) return
     const load = async () => {
       try {
-        let snap = await getDocs(query(collection(db, 'products'), where('featured', '==', true), limit(8)))
-        if (snap.empty) {
-          snap = await getDocs(query(collection(db, 'products'), limit(8)))
+        let snap
+        if (featuredOnly) {
+          snap = await getDocs(query(collection(db, collectionName), where('featured', '==', true), limit(8)))
+          if (snap.empty) snap = await getDocs(query(collection(db, collectionName), limit(8)))
+        } else {
+          snap = await getDocs(query(collection(db, collectionName), limit(8)))
         }
         setImages(snap.docs.map(d => d.data().imageUrl).filter(Boolean))
       } catch (err) {
@@ -19,7 +22,7 @@ function HeroCarousel() {
       }
     }
     load()
-  }, [])
+  }, [collectionName, featuredOnly])
 
   if (images.length === 0) return null
 

@@ -4,7 +4,7 @@ import HeroCarousel from './HeroCarousel'
 function Navbar({ showCarousel = false }) {
   return (
     <header className="relative overflow-hidden">
-      {showCarousel && <HeroCarousel />}
+      {showCarousel && <HeroCarousel featuredOnly />}
 
       {/* Translucent purple veil over the carousel so text stays readable */}
       <div className="absolute inset-0"
