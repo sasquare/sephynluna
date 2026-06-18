@@ -7,7 +7,7 @@ import {
   doc, onSnapshot, query, orderBy, serverTimestamp,
 } from 'firebase/firestore'
 import { auth, db, isFirebaseReady } from '../firebase'
-import { CATEGORIES, SIZES, BASE_TYPES, WHOLESALE_CATEGORIES, WHOLESALE_DOZEN_SIZES, WHOLESALE_BULK_SIZES } from '../constants'
+import { CATEGORIES, SIZES, BASE_TYPES, WHOLESALE_CATEGORIES, WHOLESALE_DOZEN_SIZES, WHOLESALE_BULK_SIZES, BLOG_MAX_WORDS } from '../constants'
 import { Link } from 'react-router-dom'
 
 // ─── Login ────────────────────────────────────────────────────────────────────
@@ -648,6 +648,157 @@ function WholesaleRow({ product, onEdit, onDelete }) {
   )
 }
 
+// ─── Blog Form ────────────────────────────────────────────────────────────────
+
+const EMPTY_BLOG = { title: '', content: '', imageUrl: '' }
+
+function countWords(s) {
+  return s.trim() ? s.trim().split(/\s+/).length : 0
+}
+
+function BlogForm({ initial, onSave, onCancel }) {
+  const [form,   setForm]   = useState(initial || EMPTY_BLOG)
+  const [saving, setSaving] = useState(false)
+  const [error,  setError]  = useState('')
+
+  const handleField = (e) => {
+    const { name, value } = e.target
+    setForm(prev => ({ ...prev, [name]: value }))
+  }
+
+  const words     = countWords(form.content)
+  const overLimit = words > BLOG_MAX_WORDS
+
+  const handleSave = async (e) => {
+    e.preventDefault()
+    if (!form.title.trim())   { setError('Post title is required.'); return }
+    if (!form.content.trim()) { setError('Post content is required.'); return }
+    if (overLimit) { setError(`Please keep your post to ${BLOG_MAX_WORDS} words or fewer.`); return }
+    setSaving(true); setError('')
+    try {
+      const payload = {
+        title:    form.title.trim(),
+        content:  form.content.trim(),
+        imageUrl: form.imageUrl.trim(),
+      }
+      if (initial?.id) {
+        await updateDoc(doc(db, 'blog_posts', initial.id), payload)
+      } else {
+        await addDoc(collection(db, 'blog_posts'), { ...payload, createdAt: serverTimestamp() })
+      }
+      onSave()
+    } catch (err) {
+      console.error(err)
+      setError('Failed to save post. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputCls = 'w-full px-3 py-2.5 rounded-lg border border-purple-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-purple bg-white'
+  const labelCls = 'block text-xs font-bold text-brand-purple uppercase tracking-wide mb-1'
+
+  return (
+    <form onSubmit={handleSave} className="space-y-5">
+      <h2 className="text-lg font-bold text-brand-purple"
+        style={{ fontFamily: '"Cormorant Garamond", Georgia, serif' }}>
+        {initial ? 'Edit Blog Post' : 'Write a Blog Post'}
+      </h2>
+
+      {/* Image URL */}
+      <div>
+        <label className={labelCls}>Cover Photo Link (optional)</label>
+        <input name="imageUrl" value={form.imageUrl} onChange={handleField}
+          placeholder="https://i.ibb.co/xxxxx/photo.jpg" className={inputCls} />
+        {form.imageUrl.trim() && (
+          <div className="mt-3 rounded-xl overflow-hidden border border-purple-100 aspect-video bg-purple-50">
+            <img src={form.imageUrl.trim()} alt="Preview" className="w-full h-full object-cover"
+              onError={e => { e.target.style.display = 'none' }} />
+          </div>
+        )}
+      </div>
+
+      {/* Title */}
+      <div>
+        <label className={labelCls}>Post Title *</label>
+        <input name="title" value={form.title} onChange={handleField}
+          placeholder="e.g. Why Oil-Based Perfumes Last Longer" className={inputCls} />
+      </div>
+
+      {/* Content */}
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className={labelCls}>Post Content *</label>
+          <span className={`text-xs font-semibold ${overLimit ? 'text-red-600' : 'text-gray-400'}`}>
+            {words} / {BLOG_MAX_WORDS} words
+          </span>
+        </div>
+        <textarea name="content" value={form.content} onChange={handleField}
+          rows={6} placeholder="Share a perfume tip, story, or behind-the-scenes note..."
+          className={`${inputCls} resize-none`} />
+      </div>
+
+      {error && (
+        <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg p-3">⚠ {error}</p>
+      )}
+
+      <div className="flex gap-3 pt-2">
+        <button type="submit" disabled={saving || overLimit}
+          className="flex-1 py-3 rounded-xl font-bold text-sm tracking-widest uppercase transition-all disabled:opacity-60 cursor-pointer border-0"
+          style={{ background: 'linear-gradient(135deg, #D4AF37, #F0D060)', color: '#1E0437' }}>
+          {saving ? 'Publishing…' : (initial ? 'Save Changes' : 'Publish Post')}
+        </button>
+        <button type="button" onClick={onCancel}
+          className="px-5 py-3 rounded-xl border-2 border-brand-purple text-brand-purple font-bold text-sm hover:bg-brand-purple hover:text-white transition-all cursor-pointer bg-transparent">
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
+// ─── Blog Row ─────────────────────────────────────────────────────────────────
+
+function BlogRow({ post, onEdit, onDelete }) {
+  const [confirming, setConfirming] = useState(false)
+  return (
+    <div className="flex items-center gap-4 p-4 bg-white rounded-xl border border-purple-100 hover:border-purple-300 transition-colors">
+      <div className="w-14 h-14 rounded-lg overflow-hidden bg-purple-50 flex-shrink-0">
+        {post.imageUrl
+          ? <img src={post.imageUrl} alt={post.title} className="w-full h-full object-cover" />
+          : <div className="w-full h-full flex items-center justify-center text-2xl">✍</div>}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-bold text-sm text-gray-900 truncate">{post.title}</p>
+        <p className="text-xs text-gray-500 truncate">{post.content}</p>
+      </div>
+      <div className="flex gap-2 flex-shrink-0">
+        <button onClick={() => onEdit(post)}
+          className="text-xs px-3 py-1.5 rounded-lg border border-brand-purple text-brand-purple font-medium hover:bg-brand-purple hover:text-white transition-all cursor-pointer bg-transparent">
+          Edit
+        </button>
+        {confirming ? (
+          <div className="flex gap-1">
+            <button onClick={() => onDelete(post.id)}
+              className="text-xs px-3 py-1.5 rounded-lg bg-red-600 text-white font-medium cursor-pointer border-0">
+              Confirm
+            </button>
+            <button onClick={() => setConfirming(false)}
+              className="text-xs px-2 py-1.5 rounded-lg bg-gray-100 text-gray-600 cursor-pointer border-0">
+              ✕
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setConfirming(true)}
+            className="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-medium hover:bg-red-100 transition-all cursor-pointer border-0">
+            Delete
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Admin Dashboard ──────────────────────────────────────────────────────────
 
 function AdminDashboard({ onSignOut }) {
@@ -655,16 +806,20 @@ function AdminDashboard({ onSignOut }) {
   const [products,       setProducts]       = useState([])
   const [orders,         setOrders]         = useState([])
   const [wholesale,      setWholesale]      = useState([])
+  const [blogPosts,      setBlogPosts]      = useState([])
   const [prodLoad,       setProdLoad]       = useState(true)
   const [ordLoad,        setOrdLoad]        = useState(true)
   const [wsLoad,         setWsLoad]         = useState(true)
+  const [blogLoad,       setBlogLoad]       = useState(true)
   const [view,           setView]           = useState('list')
   const [editing,        setEditing]        = useState(null)
   const [wsView,         setWsView]         = useState('list')
   const [wsEditing,      setWsEditing]      = useState(null)
+  const [blogView,       setBlogView]       = useState('list')
+  const [blogEditing,    setBlogEditing]    = useState(null)
 
   useEffect(() => {
-    if (!db) { setProdLoad(false); setOrdLoad(false); setWsLoad(false); return }
+    if (!db) { setProdLoad(false); setOrdLoad(false); setWsLoad(false); setBlogLoad(false); return }
     const unsub1 = onSnapshot(
       query(collection(db, 'products'), orderBy('createdAt', 'desc')),
       snap => { setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setProdLoad(false) }
@@ -677,7 +832,11 @@ function AdminDashboard({ onSignOut }) {
       query(collection(db, 'wholesale_products'), orderBy('createdAt', 'desc')),
       snap => { setWholesale(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setWsLoad(false) }
     )
-    return () => { unsub1(); unsub2(); unsub3() }
+    const unsub4 = onSnapshot(
+      query(collection(db, 'blog_posts'), orderBy('createdAt', 'desc')),
+      snap => { setBlogPosts(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setBlogLoad(false) }
+    )
+    return () => { unsub1(); unsub2(); unsub3(); unsub4() }
   }, [])
 
   const handleDelete = async (id) => {
@@ -687,6 +846,11 @@ function AdminDashboard({ onSignOut }) {
 
   const handleWholesaleDelete = async (id) => {
     try { await deleteDoc(doc(db, 'wholesale_products', id)) }
+    catch (err) { console.error('Delete failed:', err) }
+  }
+
+  const handleBlogDelete = async (id) => {
+    try { await deleteDoc(doc(db, 'blog_posts', id)) }
     catch (err) { console.error('Delete failed:', err) }
   }
 
@@ -721,6 +885,7 @@ function AdminDashboard({ onSignOut }) {
             { key: 'products',  label: 'Products' },
             { key: 'orders',    label: `Orders${pendingCount > 0 ? ` (${pendingCount} new)` : ''}` },
             { key: 'wholesale', label: 'Wholesale' },
+            { key: 'blog',      label: 'Blog' },
           ].map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
               className={`px-5 py-2.5 text-sm font-semibold rounded-t-xl transition-all cursor-pointer border-0 ${
@@ -857,6 +1022,68 @@ function AdminDashboard({ onSignOut }) {
                     initial={wsView === 'edit' ? wsEditing : null}
                     onSave={() => { setWsView('list'); setWsEditing(null) }}
                     onCancel={() => { setWsView('list'); setWsEditing(null) }}
+                  />
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── Blog tab ── */}
+        {activeTab === 'blog' && (
+          <>
+            {blogView === 'list' ? (
+              <>
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-xl font-bold text-brand-purple"
+                      style={{ fontFamily: '"Cormorant Garamond", Georgia, serif' }}>
+                      Perfume Journal
+                    </h2>
+                    <p className="text-gray-500 text-sm">
+                      {blogPosts.length} post{blogPosts.length !== 1 ? 's' : ''} · Max {BLOG_MAX_WORDS} words each
+                    </p>
+                  </div>
+                  <button onClick={() => setBlogView('add')}
+                    className="px-5 py-2.5 rounded-xl font-bold text-sm tracking-wide transition-all cursor-pointer border-0"
+                    style={{ background: 'linear-gradient(135deg, #D4AF37, #F0D060)', color: '#1E0437' }}>
+                    + New Post
+                  </button>
+                </div>
+
+                {blogLoad ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map(i => <div key={i} className="h-20 bg-white rounded-xl animate-pulse border border-purple-100" />)}
+                  </div>
+                ) : blogPosts.length === 0 ? (
+                  <div className="text-center py-20 bg-white rounded-2xl border border-purple-100">
+                    <div className="text-5xl mb-4">✍</div>
+                    <h3 className="font-bold text-brand-purple mb-2">No blog posts yet</h3>
+                    <p className="text-gray-500 text-sm mb-6">Share perfume tips and stories with your customers.</p>
+                    <button onClick={() => setBlogView('add')}
+                      className="px-6 py-3 rounded-xl font-bold text-sm cursor-pointer border-0"
+                      style={{ background: '#3B0764', color: 'white' }}>
+                      Write First Post
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {blogPosts.map(p => (
+                      <BlogRow key={p.id} post={p}
+                        onEdit={post => { setBlogEditing(post); setBlogView('edit') }}
+                        onDelete={handleBlogDelete} />
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+                <div className="h-1.5" style={{ background: 'linear-gradient(90deg, #3B0764, #D4AF37, #3B0764)' }} />
+                <div className="p-6 md:p-8">
+                  <BlogForm
+                    initial={blogView === 'edit' ? blogEditing : null}
+                    onSave={() => { setBlogView('list'); setBlogEditing(null) }}
+                    onCancel={() => { setBlogView('list'); setBlogEditing(null) }}
                   />
                 </div>
               </div>

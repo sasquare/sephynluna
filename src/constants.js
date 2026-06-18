@@ -47,3 +47,6 @@ export const WHOLESALE_BULK_SIZES = [
   '2 Litres',
   '5 Litres',
 ]
+
+// Blog
+export const BLOG_MAX_WORDS = 200
